@@ -71,11 +71,19 @@ export const useEmployeeRegister = () => {
     setLoading(true)
     setErrors({})
     
+    // Add timeout to prevent infinite loading
+    const timeoutId = setTimeout(() => {
+      console.error('Registration timeout - taking too long')
+      setLoading(false)
+      setErrors({ submit: 'Registration is taking too long. Please check your connection and try again.' })
+    }, 30000) // 30 second timeout
+
     try {
       const displayName = `${formData.firstName} ${formData.lastName}`
       console.log('Starting employee registration:', { email: formData.email, displayName })
       
       const result = await registerEmployeeUser(formData.email, formData.password, displayName)
+      clearTimeout(timeoutId) // Clear timeout if request completes
       console.log('Registration result:', result)
 
       if (result.success) {
@@ -93,11 +101,13 @@ export const useEmployeeRegister = () => {
           navigate('/auth/employee-profile-complete', { replace: true })
         }, 500)
       } else {
+        clearTimeout(timeoutId)
         console.error('Registration failed:', result.error)
         setErrors({ submit: result.error || 'Registration failed. Please try again.' })
         setLoading(false)
       }
     } catch (error) {
+      clearTimeout(timeoutId)
       console.error('Registration error:', error)
       const errorMessage = error instanceof Error ? error.message : 'An error occurred during registration'
       setErrors({ submit: errorMessage })

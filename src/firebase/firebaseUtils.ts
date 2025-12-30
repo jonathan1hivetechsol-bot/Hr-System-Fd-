@@ -256,13 +256,25 @@ export const updateDocument = async (collectionName: string, docId: string, data
 export const setDocument = async (collectionName: string, docId: string, data: DocumentData): Promise<FirebaseResult> => {
   try {
     const docRef = doc(db, collectionName, docId)
-    await setDoc(docRef, {
+    console.log(`Setting document in ${collectionName}/${docId}...`)
+    
+    // Create a promise with timeout
+    const setDocPromise = setDoc(docRef, {
       ...data,
       updatedAt: new Date()
     }, { merge: true })
+    
+    // Add 10 second timeout for this operation
+    const timeoutPromise = new Promise((_, reject) => 
+      setTimeout(() => reject(new Error(`Timeout writing to ${collectionName}`)), 10000)
+    )
+    
+    await Promise.race([setDocPromise, timeoutPromise])
+    console.log(`Document set successfully in ${collectionName}/${docId}`)
     return { success: true }
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+    console.error(`Error setting document in ${collectionName}/${docId}:`, errorMessage)
     return { success: false, error: errorMessage }
   }
 }
