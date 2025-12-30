@@ -1,0 +1,34 @@
+.flex-centered {
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.icons-center {
+  display: inline-flex;
+  align-items: center;
+}
+
+.arrow-none {
+  &:after {
+    display: none !important;
+  }
+
+  &:before {
+    display: none !important;
+  }
+}
+
+.cursor-pointer {
+  cursor: pointer;
+}
+
+.custom-navbar-dropdown-menu {
+  
+  @include media-breakpoint-down(lg) {
+    position: static !important;
+    transform: none !important;
+  }
+}
+
+
