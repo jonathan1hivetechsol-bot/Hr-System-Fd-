@@ -30,6 +30,9 @@ const TopHeaderBar = () => {
 
   const unreadCount = notifications.filter(n => !n.read).length
   const years = Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - i)
+  
+  // Check if user is employee
+  const isEmployee = userProfile?.role === 'employee'
 
   // Enhanced search functionality
   const handleSearch = (query: string) => {
@@ -147,19 +150,20 @@ const TopHeaderBar = () => {
       <div className="top-header-bar">
         <Container fluid className="px-3 px-md-4">
           <Row className="align-items-center py-3">
-            {/* Search Bar */}
-            <Col xs={12} sm={6} md={4} className="mb-3 mb-sm-0">
-              <div className="search-wrapper position-relative">
-                <IconifyIcon icon="lucide:search" width={18} height={18} className="search-icon" />
-                <Form.Control
-                  type="text"
-                  placeholder="Search employees, departments..."
-                  value={searchQuery}
-                  onChange={(e) => handleSearch(e.target.value)}
-                  onFocus={() => searchQuery && setShowSearchResults(true)}
-                  className="search-input"
-                />
-                <kbd className="search-shortcut">CTRL + /</kbd>
+            {/* Search Bar - Admin Only */}
+            {!isEmployee && (
+              <Col xs={12} sm={6} md={4} className="mb-3 mb-sm-0">
+                <div className="search-wrapper position-relative">
+                  <IconifyIcon icon="lucide:search" width={18} height={18} className="search-icon" />
+                  <Form.Control
+                    type="text"
+                    placeholder="Search employees, departments..."
+                    value={searchQuery}
+                    onChange={(e) => handleSearch(e.target.value)}
+                    onFocus={() => searchQuery && setShowSearchResults(true)}
+                    className="search-input"
+                  />
+                  <kbd className="search-shortcut">CTRL + /</kbd>
 
                 {/* Search Results Dropdown */}
                 {showSearchResults && searchResults.length > 0 && (
@@ -186,6 +190,7 @@ const TopHeaderBar = () => {
                 )}
               </div>
             </Col>
+            )}
 
             {/* Right Section */}
             <Col xs={12} sm={6} md={8}>
@@ -203,18 +208,20 @@ const TopHeaderBar = () => {
                   </Button>
                 </Col>
 
-                {/* Settings Icon */}
-                <Col xs="auto">
-                  <Button 
-                    variant="light" 
-                    size="sm" 
-                    className="header-btn"
-                    title="System Settings"
-                    onClick={() => navigate('/dashboards/setting')}
-                  >
-                    <IconifyIcon icon="lucide:settings" width={20} height={20} />
-                  </Button>
-                </Col>
+                {/* Settings Icon - Admin Only */}
+                {!isEmployee && (
+                  <Col xs="auto">
+                    <Button 
+                      variant="light" 
+                      size="sm" 
+                      className="header-btn"
+                      title="System Settings"
+                      onClick={() => navigate('/dashboards/setting')}
+                    >
+                      <IconifyIcon icon="lucide:settings" width={20} height={20} />
+                    </Button>
+                  </Col>
+                )}
 
                 {/* Notifications Dropdown */}
                 <Col xs="auto">
@@ -276,15 +283,16 @@ const TopHeaderBar = () => {
                   </Dropdown>
                 </Col>
 
-                {/* Export Dropdown */}
-                <Col xs="auto" className="d-none d-md-block">
-                  <Dropdown>
-                    <Dropdown.Toggle variant="light" size="sm" className="header-btn d-flex align-items-center gap-2">
-                      <IconifyIcon icon="lucide:download" width={16} height={16} />
-                      <span>Export</span>
-                    </Dropdown.Toggle>
+                {/* Export Dropdown - Admin Only */}
+                {!isEmployee && (
+                  <Col xs="auto" className="d-none d-md-block">
+                    <Dropdown>
+                      <Dropdown.Toggle variant="light" size="sm" className="header-btn d-flex align-items-center gap-2">
+                        <IconifyIcon icon="lucide:download" width={16} height={16} />
+                        <span>Export</span>
+                      </Dropdown.Toggle>
 
-                    <Dropdown.Menu align="end">
+                      <Dropdown.Menu align="end">
                       <Dropdown.Item 
                         onClick={handleExportPDF}
                         className="d-flex align-items-center gap-2"
@@ -309,28 +317,31 @@ const TopHeaderBar = () => {
                     </Dropdown.Menu>
                   </Dropdown>
                 </Col>
+                )}
 
-                {/* Year Selector */}
-                <Col xs="auto">
-                  <Dropdown>
-                    <Dropdown.Toggle variant="light" size="sm" className="header-btn d-flex align-items-center gap-2">
-                      <IconifyIcon icon="lucide:calendar" width={16} height={16} />
-                      <span>{selectedYear}</span>
-                    </Dropdown.Toggle>
+                {/* Year Selector - Admin Only */}
+                {!isEmployee && (
+                  <Col xs="auto">
+                    <Dropdown>
+                      <Dropdown.Toggle variant="light" size="sm" className="header-btn d-flex align-items-center gap-2">
+                        <IconifyIcon icon="lucide:calendar" width={16} height={16} />
+                        <span>{selectedYear}</span>
+                      </Dropdown.Toggle>
 
-                    <Dropdown.Menu align="end">
-                      {years.map((year) => (
-                        <Dropdown.Item
-                          key={year}
-                          onClick={() => setSelectedYear(year)}
-                          className={selectedYear === year ? 'active' : ''}
-                        >
-                          {year}
-                        </Dropdown.Item>
-                      ))}
-                    </Dropdown.Menu>
-                  </Dropdown>
-                </Col>
+                      <Dropdown.Menu align="end">
+                        {years.map((year) => (
+                          <Dropdown.Item
+                            key={year}
+                            onClick={() => setSelectedYear(year)}
+                            className={selectedYear === year ? 'active' : ''}
+                          >
+                            {year}
+                          </Dropdown.Item>
+                        ))}
+                      </Dropdown.Menu>
+                    </Dropdown>
+                  </Col>
+                )}
 
                 {/* Profile Avatar Dropdown */}
                 <Col xs="auto">
@@ -360,13 +371,15 @@ const TopHeaderBar = () => {
                         <IconifyIcon icon="lucide:user" width={16} height={16} />
                         My Profile
                       </Dropdown.Item>
-                      <Dropdown.Item 
-                        onClick={() => navigate('/dashboards/setting')}
-                        className="d-flex align-items-center gap-2"
-                      >
-                        <IconifyIcon icon="lucide:settings" width={16} height={16} />
-                        Account Settings
-                      </Dropdown.Item>
+                      {!isEmployee && (
+                        <Dropdown.Item 
+                          onClick={() => navigate('/dashboards/setting')}
+                          className="d-flex align-items-center gap-2"
+                        >
+                          <IconifyIcon icon="lucide:settings" width={16} height={16} />
+                          Account Settings
+                        </Dropdown.Item>
+                      )}
                       <Dropdown.Item 
                         onClick={() => window.open('https://support.example.com', '_blank')}
                         className="d-flex align-items-center gap-2"
