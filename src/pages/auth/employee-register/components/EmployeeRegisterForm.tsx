@@ -88,8 +88,20 @@ const EmployeeRegisterForm = () => {
       {errors.submit && <div className="alert alert-danger alert-dismissible fade show" role="alert">{errors.submit}</div>}
 
       <div className="mb-0 text-center d-grid">
-        <button className="btn btn-primary" type="submit" disabled={loading}>
-          {loading ? 'Registering...' : 'Sign Up'}
+        <button 
+          className="btn btn-primary" 
+          type="submit" 
+          disabled={loading}
+          style={{ opacity: loading ? 0.6 : 1, cursor: loading ? 'not-allowed' : 'pointer' }}
+        >
+          {loading ? (
+            <>
+              <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+              Registering...
+            </>
+          ) : (
+            'Sign Up'
+          )}
         </button>
       </div>
     </form>

@@ -84,9 +84,13 @@ export const registerAdmin = async (email: string, password: string, displayName
 // Register Employee
 export const registerEmployee = async (email: string, password: string, displayName: string): Promise<FirebaseResult> => {
   try {
+    console.log('Creating user with email:', email)
     const userCredential = await createUserWithEmailAndPassword(auth, email, password)
     const userId = userCredential.user.uid
+    console.log('User created with ID:', userId)
+    
     await updateProfile(userCredential.user, { displayName })
+    console.log('Profile updated with displayName:', displayName)
 
     // Create user profile in 'users' collection for role identification
     const userData = {
@@ -99,9 +103,12 @@ export const registerEmployee = async (email: string, password: string, displayN
       updatedAt: new Date()
     }
 
+    console.log('Setting user document in users collection:', userId)
     const userResult = await setDocument('users', userId, userData)
     if (!userResult.success) {
       console.warn('User profile creation failed:', userResult.error)
+    } else {
+      console.log('User profile created successfully')
     }
 
     // Create employee profile in Firestore with profileComplete: false
@@ -123,15 +130,20 @@ export const registerEmployee = async (email: string, password: string, displayN
       updatedAt: new Date()
     }
 
+    console.log('Setting employee document in employees collection:', userId)
     const employeeResult = await setDocument('employees', userId, employeeData)
     if (!employeeResult.success) {
       console.warn('Employee profile creation failed:', employeeResult.error)
       // Continue anyway, employee record will be created on profile completion
+    } else {
+      console.log('Employee profile created successfully')
     }
 
+    console.log('Registration completed successfully')
     return { success: true, user: userCredential.user, data: { ...employeeData, id: userId } }
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+    console.error('Registration error:', errorMessage)
     return { success: false, error: errorMessage }
   }
 }

@@ -69,21 +69,38 @@ export const useEmployeeRegister = () => {
     }
 
     setLoading(true)
+    setErrors({})
+    
     try {
       const displayName = `${formData.firstName} ${formData.lastName}`
+      console.log('Starting employee registration:', { email: formData.email, displayName })
+      
       const result = await registerEmployeeUser(formData.email, formData.password, displayName)
+      console.log('Registration result:', result)
 
       if (result.success) {
+        console.log('Registration successful, redirecting to profile completion...')
+        // Reset form on success
+        setFormData({
+          email: '',
+          password: '',
+          confirmPassword: '',
+          firstName: '',
+          lastName: ''
+        })
         // Redirect to profile completion page
         setTimeout(() => {
           navigate('/auth/employee-profile-complete', { replace: true })
         }, 500)
       } else {
+        console.error('Registration failed:', result.error)
         setErrors({ submit: result.error || 'Registration failed. Please try again.' })
+        setLoading(false)
       }
     } catch (error) {
-      setErrors({ submit: error instanceof Error ? error.message : 'An error occurred during registration' })
-    } finally {
+      console.error('Registration error:', error)
+      const errorMessage = error instanceof Error ? error.message : 'An error occurred during registration'
+      setErrors({ submit: errorMessage })
       setLoading(false)
     }
   }
