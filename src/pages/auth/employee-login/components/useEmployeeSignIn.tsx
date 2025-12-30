@@ -65,8 +65,9 @@ export const useEmployeeSignIn = () => {
           localStorage.removeItem('rememberEmployeeEmail')
         }
 
-        // Navigate to dashboard after successful login
+        // Small delay to let auth state update
         setTimeout(() => {
+          // AuthGuard will handle redirecting to profile completion if needed
           navigate('/dashboards/dashboard', { replace: true })
         }, 500)
       } else {
