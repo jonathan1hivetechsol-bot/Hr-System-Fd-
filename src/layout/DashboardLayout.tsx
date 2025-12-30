@@ -1,18 +1,24 @@
 import Sidebar from '@/components/layout/Sidebar'
+import EmployeeSidebar from '@/components/layout/EmployeeSidebar'
 import TopHeaderBar from '@/components/layout/TopHeaderBar'
 import ScrollToTop from '@/components/ScrollToTop'
 import { Suspense, type ReactNode, useState } from 'react'
 import { Button } from 'react-bootstrap'
 import IconifyIcon from '@/components/wrappers/IconifyIcon'
 import { ErrorBoundary } from '@/components/ErrorBoundary'
+import { useFirebase } from '@/firebase'
 import './DashboardLayout.css'
 
 const DashboardLayout = ({ children }: { children: ReactNode }) => {
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const { userProfile } = useFirebase()
 
   const handleCloseSidebar = () => {
     setSidebarOpen(false)
   }
+
+  // Determine which sidebar to show based on user role
+  const isEmployee = userProfile?.role === 'employee'
 
   return (
     <ErrorBoundary>
@@ -37,7 +43,11 @@ const DashboardLayout = ({ children }: { children: ReactNode }) => {
           }}
         >
           <Suspense fallback={<div />}>
-            <Sidebar isOpen={sidebarOpen} onClose={handleCloseSidebar} />
+            {isEmployee ? (
+              <EmployeeSidebar isOpen={sidebarOpen} onClose={handleCloseSidebar} />
+            ) : (
+              <Sidebar isOpen={sidebarOpen} onClose={handleCloseSidebar} />
+            )}
           </Suspense>
         </div>
 

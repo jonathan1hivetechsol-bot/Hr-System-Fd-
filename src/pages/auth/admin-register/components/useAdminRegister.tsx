@@ -2,6 +2,8 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useFirebase } from '@/firebase'
 
+const ADMIN_SECRET_CODE = process.env.REACT_APP_ADMIN_SECRET || 'admin123'
+
 export const useAdminRegister = () => {
   const navigate = useNavigate()
   const { registerAdminUser } = useFirebase()
@@ -10,6 +12,7 @@ export const useAdminRegister = () => {
     email: '',
     password: '',
     confirmPassword: '',
+    adminCode: '',
     firstName: '',
     lastName: ''
   })
@@ -55,6 +58,13 @@ export const useAdminRegister = () => {
 
     if (formData.password !== formData.confirmPassword) {
       newErrors.confirmPassword = 'Passwords do not match'
+    }
+
+    // Admin code validation
+    if (!formData.adminCode) {
+      newErrors.adminCode = 'Admin code is required'
+    } else if (formData.adminCode !== ADMIN_SECRET_CODE) {
+      newErrors.adminCode = 'Invalid admin code - access denied'
     }
 
     setErrors(newErrors)

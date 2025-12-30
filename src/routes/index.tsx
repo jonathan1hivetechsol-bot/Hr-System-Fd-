@@ -24,6 +24,7 @@ const HR = lazy(() => import('@/pages/(dashboards)/hr'))
 const Attendance = lazy(() => import('@/pages/(dashboards)/attendance'))
 const Leave = lazy(() => import('@/pages/(dashboards)/leave'))
 const Payroll = lazy(() => import('@/pages/(dashboards)/payroll'))
+const Chat = lazy(() => import('@/pages/(dashboards)/chat'))
 
 export type RoutesProps = {
   path: RouteProps['path']
@@ -131,6 +132,11 @@ export const dashboardPages: RoutesProps[] = [
     path: '/dashboards/payroll',
     name: 'Payroll',
     element: <Payroll />,
+  },
+  {
+    path: '/dashboards/chat',
+    name: 'Chat',
+    element: <Chat />,
   },
   {
     path: '/dashboards/setting',
