@@ -16,7 +16,7 @@ interface Notification {
 }
 
 const TopHeaderBar = () => {
-  const { user } = useFirebase()
+  const { user, userProfile } = useFirebase()
   const navigate = useNavigate()
   const { employees = [] } = useDashboard() || {}
   const [searchQuery, setSearchQuery] = useState('')
@@ -350,7 +350,11 @@ const TopHeaderBar = () => {
                       <Dropdown.Item disabled className="text-muted small">{user?.email}</Dropdown.Item>
                       <Dropdown.Divider />
                       <Dropdown.Item 
-                        onClick={() => navigate('/dashboards/employees')}
+                        onClick={() => {
+                          if (userProfile?.id) {
+                            navigate(`/dashboards/employees/${userProfile.id}`)
+                          }
+                        }}
                         className="d-flex align-items-center gap-2"
                       >
                         <IconifyIcon icon="lucide:user" width={16} height={16} />
