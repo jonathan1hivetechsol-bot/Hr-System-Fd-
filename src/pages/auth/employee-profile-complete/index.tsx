@@ -5,7 +5,7 @@ import logo from '@/assets/images/logo.png'
 import { DEPARTMENTS } from '@/assets/data/constants'
 
 const EmployeeProfileComplete = () => {
-  const { formData, errors, loading, uploadProgress, imagePreview, handleChange, handleImageChange, handleSubmit } =
+  const { formData, errors, loading, uploadProgress, imagePreviews, handleChange, handleImageChange, removeImage, handleSubmit } =
     useEmployeeProfileComplete()
 
   return (
@@ -138,32 +138,79 @@ const EmployeeProfileComplete = () => {
 
                   <div className="mb-3">
                     <label htmlFor="profileImage" className="form-label">
-                      Profile Picture <small>*</small>
+                      Profile Pictures (Up to 2) <small>*</small>
                     </label>
-                    <div className="border-2 border-dashed p-4 text-center rounded">
-                      {imagePreview ? (
+                    <div className="border-2 border-dashed p-4 text-center rounded" style={{ cursor: 'pointer' }}>
+                      {imagePreviews.length > 0 ? (
                         <div>
-                          <img src={imagePreview} alt="Preview" className="img-fluid rounded mb-3" style={{ maxHeight: '200px' }} />
-                          <div className="mt-2">
-                            <input
-                              type="file"
-                              className="form-control"
-                              id="profileImage"
-                              accept="image/*"
-                              onChange={handleImageChange}
-                            />
+                          <div className="row g-3 mb-3">
+                            {imagePreviews.map((preview, idx) => (
+                              <div key={idx} className="col-md-6">
+                                <div className="position-relative">
+                                  <img src={preview} alt={`Preview ${idx + 1}`} className="img-fluid rounded" style={{ maxHeight: '150px', objectFit: 'cover', width: '100%' }} />
+                                  <button
+                                    type="button"
+                                    className="btn btn-sm btn-danger position-absolute top-0 end-0 m-2"
+                                    onClick={() => removeImage(idx)}
+                                    title="Remove image"
+                                  >
+                                    ×
+                                  </button>
+                                </div>
+                              </div>
+                            ))}
                           </div>
-                        </div>
-                      ) : (
-                        <div>
+                          <p className="text-muted small mb-2">
+                            {imagePreviews.length} of 2 photos selected
+                          </p>
                           <input
                             type="file"
                             className="form-control"
                             id="profileImage"
                             accept="image/*"
+                            multiple
                             onChange={handleImageChange}
+                            style={{ display: 'none' }}
                           />
-                          <p className="text-muted mt-2 mb-0">Click to upload your profile picture</p>
+                          {imagePreviews.length < 2 && (
+                            <button 
+                              type="button"
+                              className="btn btn-sm btn-outline-primary me-2"
+                              onClick={() => document.getElementById('profileImage')?.click()}
+                            >
+                              Add More Photos
+                            </button>
+                          )}
+                          <button 
+                            type="button"
+                            className="btn btn-sm btn-outline-secondary"
+                            onClick={() => {
+                              const input = document.getElementById('profileImage') as HTMLInputElement
+                              if (input) input.value = ''
+                              removeImage(0)
+                            }}
+                          >
+                            Clear All
+                          </button>
+                        </div>
+                      ) : (
+                        <div onClick={() => document.getElementById('profileImage')?.click()}>
+                          <svg className="mb-3" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                            <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                            <polyline points="21 15 16 10 5 21"></polyline>
+                          </svg>
+                          <p className="text-muted mb-2">Click to upload profile pictures</p>
+                          <p className="small text-muted mb-0">(JPG, PNG - Max 5MB per file, up to 2 photos)</p>
+                          <input
+                            type="file"
+                            className="form-control"
+                            id="profileImage"
+                            accept="image/*"
+                            multiple
+                            onChange={handleImageChange}
+                            style={{ display: 'none' }}
+                          />
                         </div>
                       )}
                     </div>

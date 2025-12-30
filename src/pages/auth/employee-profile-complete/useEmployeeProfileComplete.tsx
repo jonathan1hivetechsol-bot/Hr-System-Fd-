@@ -4,6 +4,7 @@ import { useFirebase } from '@/firebase'
 import { updateDocument } from '@/firebase/firebaseUtils'
 import { ref as storageRef, uploadBytesResumable, getDownloadURL } from 'firebase/storage'
 import { storage } from '@/firebase/config'
+import { compressImages } from '@/utils/imageOptimizer'
 
 export const useEmployeeProfileComplete = () => {
   const navigate = useNavigate()
@@ -17,9 +18,9 @@ export const useEmployeeProfileComplete = () => {
     position: '',
     department: '',
     designations: '',
-    profileImage: null as File | null
+    profileImages: [] as File[]
   })
-  const [imagePreview, setImagePreview] = useState<string | null>(null)
+  const [imagePreviews, setImagePreviews] = useState<string[]>([])
   const [errors, setErrors] = useState<Record<string, string>>({})
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
@@ -38,23 +39,38 @@ export const useEmployeeProfileComplete = () => {
   }
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (file) {
+    const files = Array.from(e.target.files || [])
+    
+    // Limit to 2 images maximum
+    const selectedFiles = files.slice(0, 2)
+    const newPreviews: string[] = []
+    const newFormImages: File[] = []
+    let hasError = false
+
+    for (const file of selectedFiles) {
       if (file.size > 5 * 1024 * 1024) {
-        setErrors(prev => ({ ...prev, profileImage: 'Image size should be less than 5MB' }))
-        return
+        setErrors(prev => ({ ...prev, profileImage: 'Each image size should be less than 5MB' }))
+        hasError = true
+        break
       }
 
-      setFormData(prev => ({
-        ...prev,
-        profileImage: file
-      }))
+      newFormImages.push(file)
 
       const reader = new FileReader()
       reader.onloadend = () => {
-        setImagePreview(reader.result as string)
+        newPreviews.push(reader.result as string)
+        if (newPreviews.length === selectedFiles.length) {
+          setImagePreviews(newPreviews)
+        }
       }
       reader.readAsDataURL(file)
+    }
+
+    if (!hasError && newFormImages.length > 0) {
+      setFormData(prev => ({
+        ...prev,
+        profileImages: newFormImages
+      }))
 
       if (errors.profileImage) {
         setErrors(prev => {
@@ -64,6 +80,16 @@ export const useEmployeeProfileComplete = () => {
         })
       }
     }
+  }
+
+  const removeImage = (index: number) => {
+    const newPreviews = imagePreviews.filter((_, i) => i !== index)
+    const newFiles = formData.profileImages.filter((_, i) => i !== index)
+    setImagePreviews(newPreviews)
+    setFormData(prev => ({
+      ...prev,
+      profileImages: newFiles
+    }))
   }
 
   const validateForm = () => {
@@ -89,56 +115,75 @@ export const useEmployeeProfileComplete = () => {
       newErrors.department = 'Department is required'
     }
 
-    if (!formData.profileImage) {
-      newErrors.profileImage = 'Profile image is required'
+    if (formData.profileImages.length === 0) {
+      newErrors.profileImage = 'At least one profile image is required'
     }
 
     setErrors(newErrors)
     return Object.keys(newErrors).length === 0
   }
 
-  const uploadImage = async (): Promise<string | null> => {
-    if (!formData.profileImage || !user) {
+  const uploadImages = async (): Promise<string[] | null> => {
+    if (formData.profileImages.length === 0 || !user) {
       return null
     }
 
     try {
-      const fileName = `profile-${user.uid}-${Date.now()}`
-      const fileRef = storageRef(storage, `employee-profiles/${user.uid}/${fileName}`)
-
-      const uploadTask = uploadBytesResumable(fileRef, formData.profileImage)
-
-      return new Promise((resolve, reject) => {
-        // 45 second timeout for image upload
-        const uploadTimeoutId = setTimeout(() => {
-          reject(new Error('Image upload timeout - taking too long. Please check your connection.'))
-        }, 45000)
-
-        uploadTask.on(
-          'state_changed',
-          (snapshot) => {
-            const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100
-            setUploadProgress(progress)
-            console.log(`Upload progress: ${Math.round(progress)}%`)
-          },
-          (error) => {
-            clearTimeout(uploadTimeoutId)
-            console.error('Upload error:', error)
-            reject(new Error(`Image upload failed: ${error.message}`))
-          },
-          async () => {
-            clearTimeout(uploadTimeoutId)
-            try {
-              const downloadURL = await getDownloadURL(uploadTask.snapshot.ref)
-              resolve(downloadURL)
-            } catch (error) {
-              reject(new Error('Failed to get download URL'))
-            }
-          }
-        )
+      // Compress images before upload
+      console.log('Compressing images...')
+      const compressedFiles = await compressImages(formData.profileImages, {
+        maxWidth: 1200,
+        maxHeight: 1200,
+        quality: 0.75,
+        maxSizeKB: 400
       })
+
+      const uploadedUrls: string[] = []
+      
+      for (let i = 0; i < compressedFiles.length; i++) {
+        const file = compressedFiles[i]
+        const fileName = `profile-${user.uid}-${i}-${Date.now()}`
+        const fileRef = storageRef(storage, `employee-profiles/${user.uid}/${fileName}`)
+
+        const uploadTask = uploadBytesResumable(fileRef, file)
+
+        const url = await new Promise<string>((resolve, reject) => {
+          // 60 second timeout for each image upload (reduced from 45s since files are smaller)
+          const uploadTimeoutId = setTimeout(() => {
+            reject(new Error('Image upload timeout - taking too long. Please check your connection.'))
+          }, 60000)
+
+          uploadTask.on(
+            'state_changed',
+            (snapshot) => {
+              const totalBytes = compressedFiles.length * 100
+              const progress = ((i * 100 + (snapshot.bytesTransferred / snapshot.totalBytes) * 100) / totalBytes) * 100
+              setUploadProgress(progress)
+              console.log(`Upload progress: ${Math.round(progress)}%`)
+            },
+            (error) => {
+              clearTimeout(uploadTimeoutId)
+              console.error('Upload error:', error)
+              reject(new Error(`Image upload failed: ${error.message}`))
+            },
+            async () => {
+              clearTimeout(uploadTimeoutId)
+              try {
+                const downloadURL = await getDownloadURL(uploadTask.snapshot.ref)
+                resolve(downloadURL)
+              } catch (error) {
+                reject(new Error('Failed to get download URL'))
+              }
+            }
+          )
+        })
+
+        uploadedUrls.push(url)
+      }
+
+      return uploadedUrls
     } catch (error) {
-      console.error('Error uploading image:', error)
+      console.error('Error uploading images:', error)
       return null
     }
   }
@@ -172,16 +217,16 @@ export const useEmployeeProfileComplete = () => {
         return
       }
 
-      // Upload image
-      console.log('Uploading profile image...')
-      const imageUrl = await uploadImage()
-      if (!imageUrl) {
+      // Upload images
+      console.log('Uploading profile images...')
+      const imageUrls = await uploadImages()
+      if (!imageUrls || imageUrls.length === 0) {
         clearTimeout(timeoutId)
-        setErrors({ submit: 'Failed to upload profile image. Please check file size (max 5MB) and try again.' })
+        setErrors({ submit: 'Failed to upload profile images. Please check file size (max 5MB each) and try again.' })
         setLoading(false)
         return
       }
-      console.log('Image uploaded successfully:', imageUrl)
+      console.log('Images uploaded successfully:', imageUrls)
 
       // Update employee profile in Firestore
       const updateData = {
@@ -191,7 +236,8 @@ export const useEmployeeProfileComplete = () => {
         position: formData.position,
         department: formData.department,
         designations: formData.designations,
-        profileImage: imageUrl,
+        profileImages: imageUrls,
+        profileImage: imageUrls[0], // First image as primary
         profileComplete: true,
         updatedAt: new Date()
       }
@@ -233,9 +279,10 @@ export const useEmployeeProfileComplete = () => {
     errors,
     loading,
     uploadProgress,
-    imagePreview,
+    imagePreviews,
     handleChange,
     handleImageChange,
+    removeImage,
     handleSubmit
   }
 }
