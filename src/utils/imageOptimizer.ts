@@ -25,83 +25,117 @@ const DEFAULT_OPTIONS: ImageOptimizationOptions = {
  */
 export async function compressImage(
   file: File,
-  options: ImageOptimizationOptions = {}
+  options: ImageOptimizationOptions = {},
+  retryCount = 0
 ): Promise<File> {
   const opts = { ...DEFAULT_OPTIONS, ...options }
+  const maxRetries = 3
 
   return new Promise((resolve, reject) => {
+    // If file is already small enough, just return it
+    if (file.size < (opts.maxSizeKB || 500) * 1024) {
+      console.log(`Image already small: ${(file.size / 1024).toFixed(2)}KB`)
+      resolve(file)
+      return
+    }
+
     const reader = new FileReader()
+    const timeoutId = setTimeout(() => {
+      reader.abort()
+      if (retryCount < maxRetries) {
+        console.log(`Compression timeout, retrying... (${retryCount + 1}/${maxRetries})`)
+        compressImage(file, options, retryCount + 1).then(resolve).catch(reject)
+      } else {
+        reject(new Error('Image compression timeout after retries'))
+      }
+    }, 10000) // 10 second timeout per attempt
 
     reader.onload = (event) => {
-      const img = new Image()
+      clearTimeout(timeoutId)
+      try {
+        const img = new Image()
 
-      img.onload = () => {
-        const canvas = document.createElement('canvas')
-        let width = img.width
-        let height = img.height
+        img.onload = () => {
+          try {
+            const canvas = document.createElement('canvas')
+            let width = img.width
+            let height = img.height
 
-        // Resize if necessary
-        if (opts.maxWidth && width > opts.maxWidth) {
-          height = (height * opts.maxWidth) / width
-          width = opts.maxWidth
-        }
-
-        if (opts.maxHeight && height > opts.maxHeight) {
-          width = (width * opts.maxHeight) / height
-          height = opts.maxHeight
-        }
-
-        canvas.width = width
-        canvas.height = height
-
-        const ctx = canvas.getContext('2d')
-        if (!ctx) {
-          reject(new Error('Failed to get canvas context'))
-          return
-        }
-
-        ctx.drawImage(img, 0, 0, width, height)
-
-        canvas.toBlob(
-          (blob) => {
-            if (!blob) {
-              reject(new Error('Failed to compress image'))
-              return
+            // Resize if necessary
+            if (opts.maxWidth && width > opts.maxWidth) {
+              height = (height * opts.maxWidth) / width
+              width = opts.maxWidth
             }
 
-            const compressedFile = new File([blob], file.name, {
-              type: 'image/jpeg',
-              lastModified: Date.now()
-            })
-
-            // Check if compressed size is within limits
-            const sizeInKB = compressedFile.size / 1024
-            if (opts.maxSizeKB && sizeInKB > opts.maxSizeKB && (opts.quality || 0.8) > 0.3) {
-              // Recursively compress with lower quality
-              const lowerQuality = (opts.quality || 0.8) * 0.85
-              console.log(`Size ${sizeInKB.toFixed(0)}KB exceeds limit, trying quality: ${(lowerQuality * 100).toFixed(0)}%`)
-              compressImage(compressedFile, { ...opts, quality: lowerQuality })
-                .then(resolve)
-                .catch(reject)
-              return
+            if (opts.maxHeight && height > opts.maxHeight) {
+              width = (width * opts.maxHeight) / height
+              height = opts.maxHeight
             }
 
-            console.log(`Image compressed: ${(file.size / 1024).toFixed(2)}KB → ${(compressedFile.size / 1024).toFixed(2)}KB`)
-            resolve(compressedFile)
-          },
-          'image/jpeg',
-          opts.quality
-        )
-      }
+            canvas.width = width
+            canvas.height = height
 
-      img.onerror = () => {
-        reject(new Error('Failed to load image'))
-      }
+            const ctx = canvas.getContext('2d')
+            if (!ctx) {
+              throw new Error('Failed to get canvas context')
+            }
 
-      img.src = event.target?.result as string
+            ctx.drawImage(img, 0, 0, width, height)
+
+            // Use canvas.toBlob with proper error handling
+            canvas.toBlob(
+              (blob) => {
+                try {
+                  if (!blob) {
+                    throw new Error('Canvas blob is null')
+                  }
+
+                  const compressedFile = new File([blob], file.name, {
+                    type: 'image/jpeg',
+                    lastModified: Date.now()
+                  })
+
+                  const sizeInKB = compressedFile.size / 1024
+                  console.log(`Image compressed: ${(file.size / 1024).toFixed(2)}KB → ${sizeInKB.toFixed(2)}KB`)
+                  
+                  // If still too large, try again with lower quality
+                  if (opts.maxSizeKB && sizeInKB > opts.maxSizeKB && (opts.quality || 0.8) > 0.3) {
+                    const lowerQuality = (opts.quality || 0.8) * 0.85
+                    console.log(`Size ${sizeInKB.toFixed(0)}KB exceeds limit, retrying with quality: ${(lowerQuality * 100).toFixed(0)}%`)
+                    compressImage(compressedFile, { ...opts, quality: lowerQuality }, retryCount)
+                      .then(resolve)
+                      .catch(reject)
+                    return
+                  }
+
+                  resolve(compressedFile)
+                } catch (err) {
+                  console.error('Error in toBlob callback:', err)
+                  reject(err)
+                }
+              },
+              'image/jpeg',
+              opts.quality || 0.8
+            )
+          } catch (err) {
+            console.error('Error in image processing:', err)
+            reject(err)
+          }
+        }
+
+        img.onerror = () => {
+          reject(new Error('Failed to load image'))
+        }
+
+        img.src = event.target?.result as string
+      } catch (err) {
+        console.error('Error loading image:', err)
+        reject(err)
+      }
     }
 
     reader.onerror = () => {
+      clearTimeout(timeoutId)
       reject(new Error('Failed to read file'))
     }
 

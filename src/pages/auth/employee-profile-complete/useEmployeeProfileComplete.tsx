@@ -148,14 +148,24 @@ export const useEmployeeProfileComplete = () => {
     try {
       // Compress images before upload
       console.log('Starting compression for', formData.profileImages.length, 'images')
-      const compressedFiles = await compressImages(formData.profileImages, {
-        maxWidth: 1200,
-        maxHeight: 1200,
-        quality: 0.75,
-        maxSizeKB: 400
-      })
+      setUploadProgress(10)
       
-      console.log('Compression complete. Uploading', compressedFiles.length, 'compressed files')
+      let compressedFiles: File[] = []
+      try {
+        compressedFiles = await compressImages(formData.profileImages, {
+          maxWidth: 1200,
+          maxHeight: 1200,
+          quality: 0.75,
+          maxSizeKB: 400
+        })
+      } catch (compressError) {
+        console.warn('Compression failed, uploading original files:', compressError)
+        // If compression fails, try with original files
+        compressedFiles = formData.profileImages
+      }
+      
+      console.log('Compression complete. Uploading', compressedFiles.length, 'files')
+      setUploadProgress(20)
 
       const uploadedUrls: string[] = []
       
@@ -169,38 +179,51 @@ export const useEmployeeProfileComplete = () => {
         const uploadTask = uploadBytesResumable(fileRef, file)
 
         const url = await new Promise<string>((resolve, reject) => {
-          let uploadTimeoutId: ReturnType<typeof setTimeout>
+          let uploadTimeoutId: ReturnType<typeof setTimeout> | null = null
+          let hasResolved = false
           
-          // Set timeout based on file size (bigger files get more time)
-          const timeoutDuration = Math.max(30000, (file.size / 1024) * 10) // 10ms per KB, min 30s
+          // Timeout: 2 minutes for upload
           uploadTimeoutId = setTimeout(() => {
-            console.error('Upload timeout for image', i)
-            reject(new Error('Image upload timeout - took too long. Please check your connection.'))
-          }, timeoutDuration)
+            if (!hasResolved) {
+              console.error('Upload timeout for image', i)
+              reject(new Error('Image upload took too long. Check internet and try again.'))
+            }
+          }, 120000)
 
           uploadTask.on(
             'state_changed',
             (snapshot) => {
               const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100
-              const overallProgress = ((i * 100 + progress) / compressedFiles.length)
-              setUploadProgress(overallProgress)
-              console.log(`Image ${i + 1} progress: ${Math.round(progress)}%, Overall: ${Math.round(overallProgress)}%`)
+              const overallProgress = (20 + (i * 35 + progress * 0.35))
+              setUploadProgress(Math.min(overallProgress, 95))
+              console.log(`Image ${i + 1} progress: ${Math.round(progress)}%`)
             },
             (error) => {
-              clearTimeout(uploadTimeoutId)
-              console.error('Firebase upload error for image', i, ':', error.message)
-              reject(new Error(`Image ${i + 1} upload failed: ${error.message}`))
+              if (uploadTimeoutId) clearTimeout(uploadTimeoutId)
+              if (!hasResolved) {
+                hasResolved = true
+                console.error('Firebase upload error for image', i, ':', error.code, error.message)
+                const errorMsg = error.code === 'storage/unauthenticated' 
+                  ? 'Authentication failed. Please login again.'
+                  : error.code === 'storage/quota-exceeded'
+                  ? 'Storage quota exceeded. Contact admin.'
+                  : error.message || 'Upload failed'
+                reject(new Error(errorMsg))
+              }
             },
             async () => {
-              clearTimeout(uploadTimeoutId)
-              try {
-                console.log(`Getting download URL for image ${i + 1}`)
-                const downloadURL = await getDownloadURL(uploadTask.snapshot.ref)
-                console.log(`Image ${i + 1} uploaded successfully: ${downloadURL.substring(0, 50)}...`)
-                resolve(downloadURL)
-              } catch (error) {
-                console.error('Failed to get download URL for image', i, ':', error)
-                reject(new Error(`Failed to get download URL for image ${i + 1}`))
+              if (uploadTimeoutId) clearTimeout(uploadTimeoutId)
+              if (!hasResolved) {
+                hasResolved = true
+                try {
+                  console.log(`Getting download URL for image ${i + 1}`)
+                  const downloadURL = await getDownloadURL(uploadTask.snapshot.ref)
+                  console.log(`Image ${i + 1} uploaded successfully`)
+                  resolve(downloadURL)
+                } catch (error) {
+                  console.error('Failed to get download URL:', error)
+                  reject(new Error('Failed to process uploaded file'))
+                }
               }
             }
           )
@@ -210,9 +233,11 @@ export const useEmployeeProfileComplete = () => {
       }
 
       console.log('All images uploaded successfully:', uploadedUrls.length)
+      setUploadProgress(95)
       return uploadedUrls
     } catch (error) {
       console.error('Error in uploadImages:', error instanceof Error ? error.message : error)
+      setUploadProgress(0)
       return null
     }
   }
