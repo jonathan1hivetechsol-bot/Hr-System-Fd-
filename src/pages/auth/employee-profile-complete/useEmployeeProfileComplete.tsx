@@ -22,7 +22,7 @@ export const useEmployeeProfileComplete = () => {
   const [imagePreview, setImagePreview] = useState<string | null>(null)
   const [errors, setErrors] = useState<Record<string, string>>({})
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target
     setFormData(prev => ({
       ...prev,
@@ -117,11 +117,15 @@ export const useEmployeeProfileComplete = () => {
           },
           (error) => {
             console.error('Upload error:', error)
-            reject(error)
+            reject(new Error(`Image upload failed: ${error.message}`))
           },
           async () => {
-            const downloadURL = await getDownloadURL(uploadTask.snapshot.ref)
-            resolve(downloadURL)
+            try {
+              const downloadURL = await getDownloadURL(uploadTask.snapshot.ref)
+              resolve(downloadURL)
+            } catch (error) {
+              reject(new Error('Failed to get download URL'))
+            }
           }
         )
       })
@@ -139,45 +143,57 @@ export const useEmployeeProfileComplete = () => {
     }
 
     setLoading(true)
+    setErrors({}) // Clear previous errors
     try {
+      // Check if user and profile exist
+      if (!user) {
+        setErrors({ submit: 'User not authenticated. Please login again.' })
+        setLoading(false)
+        return
+      }
+
+      if (!userProfile || !userProfile.id) {
+        setErrors({ submit: 'User profile not found. Please login again.' })
+        setLoading(false)
+        return
+      }
+
       // Upload image
       const imageUrl = await uploadImage()
       if (!imageUrl) {
-        setErrors({ submit: 'Failed to upload profile image' })
+        setErrors({ submit: 'Failed to upload profile image. Please check file size (max 5MB) and try again.' })
         setLoading(false)
         return
       }
 
       // Update employee profile in Firestore
-      if (userProfile && userProfile.id) {
-        const updateData = {
-          phone: formData.phone,
-          address: formData.address,
-          dateOfBirth: formData.dateOfBirth,
-          position: formData.position,
-          department: formData.department,
-          designations: formData.designations,
-          profileImage: imageUrl,
-          profileComplete: true,
-          updatedAt: new Date()
-        }
+      const updateData = {
+        phone: formData.phone,
+        address: formData.address,
+        dateOfBirth: formData.dateOfBirth,
+        position: formData.position,
+        department: formData.department,
+        designations: formData.designations,
+        profileImage: imageUrl,
+        profileComplete: true,
+        updatedAt: new Date()
+      }
 
-        const result = await updateDocument('employees', userProfile.id, updateData)
+      const result = await updateDocument('employees', userProfile.id, updateData)
 
-        if (result.success) {
-          setTimeout(() => {
-            navigate('/dashboards/dashboard', { replace: true })
-          }, 500)
-        } else {
-          setErrors({ submit: result.error || 'Failed to update profile' })
-        }
+      if (result.success) {
+        setTimeout(() => {
+          navigate('/dashboards/dashboard', { replace: true })
+        }, 500)
       } else {
-        setErrors({ submit: 'User profile not found' })
+        setErrors({ submit: result.error || 'Failed to update profile. Please try again.' })
+        setLoading(false)
       }
     } catch (error) {
-      setErrors({ submit: error instanceof Error ? error.message : 'An error occurred' })
-    } finally {
+      console.error('Profile completion error:', error)
+      setErrors({ submit: error instanceof Error ? error.message : 'An unexpected error occurred. Please try again.' })
       setLoading(false)
+    } finally {
       setUploadProgress(0)
     }
   }
