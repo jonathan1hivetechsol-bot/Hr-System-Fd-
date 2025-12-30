@@ -67,8 +67,10 @@ export const useEmployeeSignIn = () => {
 
         // Small delay to let auth state update
         setTimeout(() => {
-          // AuthGuard will handle redirecting to profile completion if needed
-          navigate('/dashboards/dashboard', { replace: true })
+          // AuthGuard will check if profile is complete
+          // If not, redirects to /auth/employee-profile-complete
+          // If yes, allows access to /dashboards/dashboard/employee
+          navigate('/dashboards/dashboard/employee', { replace: true })
         }, 500)
       } else {
         setErrors({ submit: result.error || 'Login failed. Please try again.' })

@@ -30,6 +30,21 @@ const AuthGuard = ({ children }: AuthGuardProps) => {
     return <Navigate to="/auth/employee-profile-complete" state={{ from: location }} replace />
   }
 
+  // Role-based access control
+  // Employees cannot access admin pages (HR, Admin dashboard)
+  if (userProfile?.role === 'employee') {
+    const restrictedPaths = [
+      '/dashboards/hr',
+      '/dashboards/admin',
+      '/dashboards/dashboard' // Main dashboard is admin only
+    ]
+    
+    if (restrictedPaths.some(path => location.pathname.startsWith(path))) {
+      // Redirect employee to their own dashboard
+      return <Navigate to="/dashboards/dashboard/employee" replace />
+    }
+  }
+
   return <>{children}</>
 }
 

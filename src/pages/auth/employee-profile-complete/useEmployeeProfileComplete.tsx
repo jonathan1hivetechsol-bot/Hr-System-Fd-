@@ -145,18 +145,14 @@ export const useEmployeeProfileComplete = () => {
     setLoading(true)
     setErrors({}) // Clear previous errors
     try {
-      // Check if user and profile exist
+      // Check if user is authenticated
       if (!user) {
         setErrors({ submit: 'User not authenticated. Please login again.' })
         setLoading(false)
         return
       }
 
-      if (!userProfile || !userProfile.id) {
-        setErrors({ submit: 'User profile not found. Please login again.' })
-        setLoading(false)
-        return
-      }
+      // Note: userProfile might not be fully loaded yet, but we can use user.uid
 
       // Upload image
       const imageUrl = await uploadImage()
@@ -179,11 +175,17 @@ export const useEmployeeProfileComplete = () => {
         updatedAt: new Date()
       }
 
-      const result = await updateDocument('employees', userProfile.id, updateData)
+      const result = await updateDocument('employees', user.uid, updateData)
 
       if (result.success) {
+        // Also update the 'users' collection to mark profile as complete
+        await updateDocument('users', user.uid, { profileComplete: true, updatedAt: new Date() }).catch(err => {
+          console.warn('Warning: Could not update user profile metadata:', err)
+        })
+
         setTimeout(() => {
-          navigate('/dashboards/dashboard', { replace: true })
+          // Redirect employee to their own dashboard after profile completion
+          navigate('/dashboards/dashboard/employee', { replace: true })
         }, 500)
       } else {
         setErrors({ submit: result.error || 'Failed to update profile. Please try again.' })

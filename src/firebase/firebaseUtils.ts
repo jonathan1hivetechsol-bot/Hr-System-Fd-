@@ -9,6 +9,7 @@ import {
   collection,
   addDoc,
   updateDoc,
+  setDoc,
   deleteDoc,
   doc,
   getDoc,
@@ -84,7 +85,24 @@ export const registerAdmin = async (email: string, password: string, displayName
 export const registerEmployee = async (email: string, password: string, displayName: string): Promise<FirebaseResult> => {
   try {
     const userCredential = await createUserWithEmailAndPassword(auth, email, password)
+    const userId = userCredential.user.uid
     await updateProfile(userCredential.user, { displayName })
+
+    // Create user profile in 'users' collection for role identification
+    const userData = {
+      name: displayName,
+      email: email,
+      role: 'employee' as const,
+      userId: userId,
+      profileComplete: false,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    }
+
+    const userResult = await setDocument('users', userId, userData)
+    if (!userResult.success) {
+      console.warn('User profile creation failed:', userResult.error)
+    }
 
     // Create employee profile in Firestore with profileComplete: false
     const employeeData = {
@@ -96,7 +114,7 @@ export const registerEmployee = async (email: string, password: string, displayN
       salary: 0,
       hireDate: new Date().toISOString().split('T')[0],
       status: 'active' as const,
-      userId: userCredential.user.uid,
+      userId: userId,
       profileComplete: false, // Flag to force profile completion
       profileImage: undefined,
       phone: '',
@@ -105,12 +123,13 @@ export const registerEmployee = async (email: string, password: string, displayN
       updatedAt: new Date()
     }
 
-    const employeeResult = await addDocument('employees', employeeData)
+    const employeeResult = await setDocument('employees', userId, employeeData)
     if (!employeeResult.success) {
-      console.warn('Employee created but profile creation failed:', employeeResult.error)
+      console.warn('Employee profile creation failed:', employeeResult.error)
+      // Continue anyway, employee record will be created on profile completion
     }
 
-    return { success: true, user: userCredential.user, data: { ...employeeData, id: employeeResult.id } }
+    return { success: true, user: userCredential.user, data: { ...employeeData, id: userId } }
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error'
     return { success: false, error: errorMessage }
@@ -215,6 +234,20 @@ export const updateDocument = async (collectionName: string, docId: string, data
       ...data,
       updatedAt: new Date()
     })
+    return { success: true }
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+    return { success: false, error: errorMessage }
+  }
+}
+
+export const setDocument = async (collectionName: string, docId: string, data: DocumentData): Promise<FirebaseResult> => {
+  try {
+    const docRef = doc(db, collectionName, docId)
+    await setDoc(docRef, {
+      ...data,
+      updatedAt: new Date()
+    }, { merge: true })
     return { success: true }
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error'
