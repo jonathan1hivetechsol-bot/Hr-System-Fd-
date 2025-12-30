@@ -109,17 +109,25 @@ export const useEmployeeProfileComplete = () => {
       const uploadTask = uploadBytesResumable(fileRef, formData.profileImage)
 
       return new Promise((resolve, reject) => {
+        // 45 second timeout for image upload
+        const uploadTimeoutId = setTimeout(() => {
+          reject(new Error('Image upload timeout - taking too long. Please check your connection.'))
+        }, 45000)
+
         uploadTask.on(
           'state_changed',
           (snapshot) => {
             const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100
             setUploadProgress(progress)
+            console.log(`Upload progress: ${Math.round(progress)}%`)
           },
           (error) => {
+            clearTimeout(uploadTimeoutId)
             console.error('Upload error:', error)
             reject(new Error(`Image upload failed: ${error.message}`))
           },
           async () => {
+            clearTimeout(uploadTimeoutId)
             try {
               const downloadURL = await getDownloadURL(uploadTask.snapshot.ref)
               resolve(downloadURL)
@@ -143,24 +151,37 @@ export const useEmployeeProfileComplete = () => {
     }
 
     setLoading(true)
-    setErrors({}) // Clear previous errors
+    setErrors({})
+    
+    // Add timeout to prevent infinite loading
+    const timeoutId = setTimeout(() => {
+      console.error('Profile completion timeout - taking too long')
+      setLoading(false)
+      setErrors({ submit: 'Profile completion is taking too long. Please check your connection and try again.' })
+      setUploadProgress(0)
+    }, 60000) // 60 second timeout for profile completion (includes image upload)
+
     try {
+      console.log('Starting profile completion for user:', user?.uid)
+      
       // Check if user is authenticated
       if (!user) {
+        clearTimeout(timeoutId)
         setErrors({ submit: 'User not authenticated. Please login again.' })
         setLoading(false)
         return
       }
 
-      // Note: userProfile might not be fully loaded yet, but we can use user.uid
-
       // Upload image
+      console.log('Uploading profile image...')
       const imageUrl = await uploadImage()
       if (!imageUrl) {
+        clearTimeout(timeoutId)
         setErrors({ submit: 'Failed to upload profile image. Please check file size (max 5MB) and try again.' })
         setLoading(false)
         return
       }
+      console.log('Image uploaded successfully:', imageUrl)
 
       // Update employee profile in Firestore
       const updateData = {
@@ -175,23 +196,30 @@ export const useEmployeeProfileComplete = () => {
         updatedAt: new Date()
       }
 
+      console.log('Updating employee document...')
       const result = await updateDocument('employees', user.uid, updateData)
 
       if (result.success) {
+        console.log('Employee profile updated successfully')
         // Also update the 'users' collection to mark profile as complete
         await updateDocument('users', user.uid, { profileComplete: true, updatedAt: new Date() }).catch(err => {
           console.warn('Warning: Could not update user profile metadata:', err)
         })
 
+        clearTimeout(timeoutId)
+        console.log('Redirecting to employee dashboard...')
         setTimeout(() => {
           // Redirect employee to their own dashboard after profile completion
           navigate('/dashboards/dashboard/employee', { replace: true })
         }, 500)
       } else {
+        clearTimeout(timeoutId)
+        console.error('Profile update failed:', result.error)
         setErrors({ submit: result.error || 'Failed to update profile. Please try again.' })
         setLoading(false)
       }
     } catch (error) {
+      clearTimeout(timeoutId)
       console.error('Profile completion error:', error)
       setErrors({ submit: error instanceof Error ? error.message : 'An unexpected error occurred. Please try again.' })
       setLoading(false)
