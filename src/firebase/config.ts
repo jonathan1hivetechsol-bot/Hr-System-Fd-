@@ -1,8 +1,8 @@
 import { initializeApp } from "firebase/app";
-import { getAuth } from "firebase/auth";
-import { getFirestore } from "firebase/firestore";
+import { getAuth, connectAuthEmulator } from "firebase/auth";
+import { getFirestore, connectFirestoreEmulator } from "firebase/firestore";
 import { getMessaging } from "firebase/messaging";
-import { getStorage } from 'firebase/storage'
+import { getStorage, connectStorageEmulator } from 'firebase/storage'
 
 const firebaseConfig = {
   apiKey: "AIzaSyAsVP2ylJa8qR436hh9qsRIyeZDz4696nk",
@@ -23,3 +23,18 @@ export const db = getFirestore(app);
 export const messaging = getMessaging(app);
 export const storage = getStorage(app);
 export const VAPID_KEY = "BImVY9oocAJQA4lSTyrTGkPAbuU_7LQF9f37fHfwR5qYFdCPyey4JjY7xd-y-ZpAgLQRi7PXZe3BD6EgkRWeA70";
+
+// Connect to Firebase Emulator Suite in development
+if (import.meta.env.DEV && window.location.hostname === 'localhost') {
+  try {
+    connectAuthEmulator(auth, 'http://localhost:9099', { disableWarnings: true });
+    connectFirestoreEmulator(db, 'localhost', 8080);
+    connectStorageEmulator(storage, 'localhost', 9199);
+    console.log('✅ Firebase Emulator Suite connected');
+  } catch (error: any) {
+    // Emulator already connected
+    if (!error.message?.includes('already connected')) {
+      console.error('Emulator connection error:', error);
+    }
+  }
+}

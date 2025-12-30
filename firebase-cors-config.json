@@ -1,0 +1,26 @@
+[
+  {
+    "origin": ["http://localhost:5173", "http://localhost:3000", "http://localhost:4173"],
+    "method": ["GET", "HEAD", "DELETE"],
+    "responseHeader": ["Content-Type", "x-goog-meta-*"],
+    "maxAgeSeconds": 3600
+  },
+  {
+    "origin": ["http://localhost:5173", "http://localhost:3000", "http://localhost:4173"],
+    "method": ["PUT", "POST", "OPTIONS"],
+    "responseHeader": ["Content-Type", "x-goog-meta-*"],
+    "maxAgeSeconds": 3600
+  },
+  {
+    "origin": ["https://future-designz-hr-panel.vercel.app", "https://*.vercel.app"],
+    "method": ["GET", "HEAD", "DELETE"],
+    "responseHeader": ["Content-Type", "x-goog-meta-*"],
+    "maxAgeSeconds": 3600
+  },
+  {
+    "origin": ["https://future-designz-hr-panel.vercel.app", "https://*.vercel.app"],
+    "method": ["PUT", "POST", "OPTIONS"],
+    "responseHeader": ["Content-Type", "x-goog-meta-*"],
+    "maxAgeSeconds": 3600
+  }
+]

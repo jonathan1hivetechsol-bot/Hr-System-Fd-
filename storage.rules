@@ -1,0 +1,17 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    // Allow authenticated users to upload their own profile pictures
+    match /employee-profiles/{userId}/{allPaths=**} {
+      allow read: if request.auth.uid == userId || 
+                     request.auth != null;
+      allow write: if request.auth.uid == userId;
+      allow delete: if request.auth.uid == userId;
+    }
+    
+    // Allow admin access to everything
+    match /{allPaths=**} {
+      allow read, write, delete: if request.auth != null;
+    }
+  }
+}
