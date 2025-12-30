@@ -94,14 +94,14 @@ export const authRoutes: RoutesProps[] = [
 
 export const dashboardPages: RoutesProps[] = [
   {
-    path: '/dashboards/dashboard',
-    name: 'Dashboard',
-    element: <Dashboard />,
-  },
-  {
     path: '/dashboards/dashboard/employee',
     name: 'Employee Dashboard',
     element: <EmployeeDashboard />,
+  },
+  {
+    path: '/dashboards/dashboard',
+    name: 'Dashboard',
+    element: <Dashboard />,
   },
   {
     path: '/dashboards/employees',

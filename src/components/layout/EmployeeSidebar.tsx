@@ -1,5 +1,4 @@
 import { Link, useLocation } from 'react-router-dom'
-import { useState } from 'react'
 import IconifyIcon from '../wrappers/IconifyIcon'
 
 interface EmployeeSidebarProps {
