@@ -7,7 +7,8 @@ const Register = lazy(() => import('@/pages/auth/register/page'))
 const ForPass = lazy(() => import('@/pages/auth/forgot-pass'))
 const ConfirmAcc = lazy(() => import('@/pages/auth/confirm-account'))
 
-// New role-based auth pages
+// Role selection and role-based auth pages
+const AuthRoleSelection = lazy(() => import('@/pages/auth/role-selection'))
 const AdminLogin = lazy(() => import('@/pages/auth/admin-login'))
 const AdminRegister = lazy(() => import('@/pages/auth/admin-register'))
 const EmployeeLogin = lazy(() => import('@/pages/auth/employee-login'))
@@ -37,11 +38,18 @@ const initialRoutes: RoutesProps[] = [
   {
     path: '/',
     name: 'root',
-    element: <Navigate to="/auth/employee-login" />,
+    element: <Navigate to="/auth/role-selection" />,
   },
 ]
 
 export const authRoutes: RoutesProps[] = [
+  // Role selection
+  {
+    path: '/auth/role-selection',
+    name: 'Choose Role',
+    element: <AuthRoleSelection />,
+  },
+  
   // Original auth routes
   {
     path: '/auth/login',

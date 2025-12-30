@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useFirebase } from '@/firebase'
 
-const ADMIN_SECRET_CODE = process.env.REACT_APP_ADMIN_SECRET || 'admin123'
+const ADMIN_SECRET_CODE = 'Hamza0327@@'
 
 export const useAdminRegister = () => {
   const navigate = useNavigate()
