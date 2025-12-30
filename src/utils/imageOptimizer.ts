@@ -69,21 +69,22 @@ export async function compressImage(
               return
             }
 
-            // Check if compressed size is within limits
-            const sizeInKB = blob.size / 1024
-            if (opts.maxSizeKB && sizeInKB > opts.maxSizeKB) {
-              // Recursively compress with lower quality
-              const lowerQuality = (opts.quality || 0.8) * 0.9
-              compressImage(file, { ...opts, quality: lowerQuality })
-                .then(resolve)
-                .catch(reject)
-              return
-            }
-
             const compressedFile = new File([blob], file.name, {
               type: 'image/jpeg',
               lastModified: Date.now()
             })
+
+            // Check if compressed size is within limits
+            const sizeInKB = compressedFile.size / 1024
+            if (opts.maxSizeKB && sizeInKB > opts.maxSizeKB && (opts.quality || 0.8) > 0.3) {
+              // Recursively compress with lower quality
+              const lowerQuality = (opts.quality || 0.8) * 0.85
+              console.log(`Size ${sizeInKB.toFixed(0)}KB exceeds limit, trying quality: ${(lowerQuality * 100).toFixed(0)}%`)
+              compressImage(compressedFile, { ...opts, quality: lowerQuality })
+                .then(resolve)
+                .catch(reject)
+              return
+            }
 
             console.log(`Image compressed: ${(file.size / 1024).toFixed(2)}KB → ${(compressedFile.size / 1024).toFixed(2)}KB`)
             resolve(compressedFile)

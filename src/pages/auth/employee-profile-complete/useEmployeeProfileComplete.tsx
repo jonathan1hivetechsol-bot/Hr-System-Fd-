@@ -48,8 +48,16 @@ export const useEmployeeProfileComplete = () => {
     let hasError = false
 
     for (const file of selectedFiles) {
-      if (file.size > 5 * 1024 * 1024) {
-        setErrors(prev => ({ ...prev, profileImage: 'Each image size should be less than 5MB' }))
+      // Check file size (10MB limit before compression)
+      if (file.size > 10 * 1024 * 1024) {
+        setErrors(prev => ({ ...prev, profileImage: `File "${file.name}" is too large (${(file.size / (1024 * 1024)).toFixed(1)}MB). Max 10MB per file.` }))
+        hasError = true
+        break
+      }
+
+      // Check file type
+      if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+        setErrors(prev => ({ ...prev, profileImage: `File "${file.name}" format not supported. Use JPG, PNG or WebP.` }))
         hasError = true
         break
       }
@@ -57,16 +65,25 @@ export const useEmployeeProfileComplete = () => {
       newFormImages.push(file)
 
       const reader = new FileReader()
-      reader.onloadend = () => {
-        newPreviews.push(reader.result as string)
-        if (newPreviews.length === selectedFiles.length) {
-          setImagePreviews(newPreviews)
+      reader.onloadend = (event) => {
+        if (event.target?.result) {
+          newPreviews.push(event.target.result as string)
+          if (newPreviews.length === selectedFiles.length) {
+            console.log(`Successfully loaded ${newPreviews.length} image previews`)
+            setImagePreviews(newPreviews)
+          }
         }
+      }
+      reader.onerror = () => {
+        console.error(`Failed to read file: ${file.name}`)
+        setErrors(prev => ({ ...prev, profileImage: `Failed to read file "${file.name}"` }))
+        hasError = true
       }
       reader.readAsDataURL(file)
     }
 
     if (!hasError && newFormImages.length > 0) {
+      console.log(`Image selection: ${newFormImages.length} files, ${newPreviews.length} previews`)
       setFormData(prev => ({
         ...prev,
         profileImages: newFormImages
@@ -130,49 +147,60 @@ export const useEmployeeProfileComplete = () => {
 
     try {
       // Compress images before upload
-      console.log('Compressing images...')
+      console.log('Starting compression for', formData.profileImages.length, 'images')
       const compressedFiles = await compressImages(formData.profileImages, {
         maxWidth: 1200,
         maxHeight: 1200,
         quality: 0.75,
         maxSizeKB: 400
       })
+      
+      console.log('Compression complete. Uploading', compressedFiles.length, 'compressed files')
 
       const uploadedUrls: string[] = []
       
       for (let i = 0; i < compressedFiles.length; i++) {
         const file = compressedFiles[i]
+        console.log(`Uploading image ${i + 1}/${compressedFiles.length}: ${(file.size / 1024).toFixed(2)}KB`)
+        
         const fileName = `profile-${user.uid}-${i}-${Date.now()}`
         const fileRef = storageRef(storage, `employee-profiles/${user.uid}/${fileName}`)
 
         const uploadTask = uploadBytesResumable(fileRef, file)
 
         const url = await new Promise<string>((resolve, reject) => {
-          // 60 second timeout for each image upload (reduced from 45s since files are smaller)
-          const uploadTimeoutId = setTimeout(() => {
-            reject(new Error('Image upload timeout - taking too long. Please check your connection.'))
-          }, 60000)
+          let uploadTimeoutId: ReturnType<typeof setTimeout>
+          
+          // Set timeout based on file size (bigger files get more time)
+          const timeoutDuration = Math.max(30000, (file.size / 1024) * 10) // 10ms per KB, min 30s
+          uploadTimeoutId = setTimeout(() => {
+            console.error('Upload timeout for image', i)
+            reject(new Error('Image upload timeout - took too long. Please check your connection.'))
+          }, timeoutDuration)
 
           uploadTask.on(
             'state_changed',
             (snapshot) => {
-              const totalBytes = compressedFiles.length * 100
-              const progress = ((i * 100 + (snapshot.bytesTransferred / snapshot.totalBytes) * 100) / totalBytes) * 100
-              setUploadProgress(progress)
-              console.log(`Upload progress: ${Math.round(progress)}%`)
+              const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100
+              const overallProgress = ((i * 100 + progress) / compressedFiles.length)
+              setUploadProgress(overallProgress)
+              console.log(`Image ${i + 1} progress: ${Math.round(progress)}%, Overall: ${Math.round(overallProgress)}%`)
             },
             (error) => {
               clearTimeout(uploadTimeoutId)
-              console.error('Upload error:', error)
-              reject(new Error(`Image upload failed: ${error.message}`))
+              console.error('Firebase upload error for image', i, ':', error.message)
+              reject(new Error(`Image ${i + 1} upload failed: ${error.message}`))
             },
             async () => {
               clearTimeout(uploadTimeoutId)
               try {
+                console.log(`Getting download URL for image ${i + 1}`)
                 const downloadURL = await getDownloadURL(uploadTask.snapshot.ref)
+                console.log(`Image ${i + 1} uploaded successfully: ${downloadURL.substring(0, 50)}...`)
                 resolve(downloadURL)
               } catch (error) {
-                reject(new Error('Failed to get download URL'))
+                console.error('Failed to get download URL for image', i, ':', error)
+                reject(new Error(`Failed to get download URL for image ${i + 1}`))
               }
             }
           )
@@ -181,9 +209,10 @@ export const useEmployeeProfileComplete = () => {
         uploadedUrls.push(url)
       }
 
+      console.log('All images uploaded successfully:', uploadedUrls.length)
       return uploadedUrls
     } catch (error) {
-      console.error('Error uploading images:', error)
+      console.error('Error in uploadImages:', error instanceof Error ? error.message : error)
       return null
     }
   }
@@ -198,13 +227,13 @@ export const useEmployeeProfileComplete = () => {
     setLoading(true)
     setErrors({})
     
-    // Add timeout to prevent infinite loading
+    // Add timeout to prevent infinite loading - 2 minutes for profile completion
     const timeoutId = setTimeout(() => {
       console.error('Profile completion timeout - taking too long')
       setLoading(false)
-      setErrors({ submit: 'Profile completion is taking too long. Please check your connection and try again.' })
+      setErrors({ submit: 'Profile completion took too long. Please check your connection and try again.' })
       setUploadProgress(0)
-    }, 60000) // 60 second timeout for profile completion (includes image upload)
+    }, 120000) // 2 minutes timeout
 
     try {
       console.log('Starting profile completion for user:', user?.uid)
@@ -222,7 +251,7 @@ export const useEmployeeProfileComplete = () => {
       const imageUrls = await uploadImages()
       if (!imageUrls || imageUrls.length === 0) {
         clearTimeout(timeoutId)
-        setErrors({ submit: 'Failed to upload profile images. Please check file size (max 5MB each) and try again.' })
+        setErrors({ submit: 'Failed to upload profile images. Please ensure your images are in JPG, PNG or WebP format and less than 10MB. Check your internet connection and try again.' })
         setLoading(false)
         return
       }
